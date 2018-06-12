@@ -8,6 +8,6 @@ public class CreateHelpRequestTest {
         //RequestHelpHandler createHelpTest=new RequestHelpHandler();
         //System.out.print(createHelpTest.createHelpRequest(1,1));
         ProcessHelpResponseHandler Help=new ProcessHelpResponseHandler();
-        Help.updateBestVolunteerId(1,527811267);
+        //Help.updateBestVolunteerId(1,527811267);
     }
 }

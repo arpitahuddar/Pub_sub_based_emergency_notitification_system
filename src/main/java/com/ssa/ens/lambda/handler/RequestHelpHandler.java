@@ -15,11 +15,13 @@ import java.util.Map;
 public class RequestHelpHandler implements RequestHandler<Map<String,Object>, GatewayResponse> {
     public GatewayResponse handleRequest(Map<String,Object> input, Context context)
     {
+
         context.getLogger().log("Received Input: " + input.toString());
         final Integer userId = Integer.valueOf((String) input.get("userId"));
         final Integer topicId = Integer.valueOf((String) input.get("topicId"));
         double lat=Double.valueOf((String) input.get("lat"));
         double lon=Double.valueOf((String) input.get("lon"));
+
 
         context.getLogger().log(String.format("Creating help request for user:%d,topicId:%d", userId, topicId));
 
@@ -55,7 +57,7 @@ public class RequestHelpHandler implements RequestHandler<Map<String,Object>, Ga
         //Timestamp expiry_time = new Timestamp((current_time.getTime()));
         String helpStatus="In Progress";
         String sql;
-        sql=String.format("INSERT INTO innodb.Help(User_id, Topic_id, Help_status) values (%d, %d, '%s')", userId, topicId, "in_progress");
+        sql=String.format("INSERT INTO innodb.Help(User_id, Topic_id, Help_status) values (%d, %d, '%s')", userId, topicId,helpStatus);
         int helpRequestId;
         DatabaseConnect dbconnect = new DatabaseConnect();
         helpRequestId = dbconnect.insertNewHelpRequest(userId,topicId);

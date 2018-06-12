@@ -10,7 +10,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Random;
 
-public class DatabaseConnect implements RequestHandler<String,Object> {
+public class DatabaseConnect {
     /*public static void main(String[] args){
         DatabaseConnect testConnect = new DatabaseConnect();
         System.out.print(testConnect.getResult());*/
@@ -63,22 +63,33 @@ public class DatabaseConnect implements RequestHandler<String,Object> {
         return helpRequestId;
     }
 
-    public void updateBestVolunteerDb(String Query) {
+    public boolean updateBestVolunteerDb(int volunteerupdateId, int helpRequestId) {
+
         try {
             Connection connect = DriverManager.getConnection(URL,USERNAME,PASSWORD);
+            connect.setAutoCommit(false);
+            String sqlfFindVolunteerStatus=String.format("UPDATE innodb.Users SET User_currentHelpRequestId =%d WHERE User_id = %d and User_currentHelpRequestId IS NULL",helpRequestId,volunteerupdateId);
             Statement stmt = connect.createStatement();
-            stmt.executeUpdate(Query);
+            if(stmt.executeUpdate(sqlfFindVolunteerStatus)>0)
+            {
+                String sqlUpdate= String.format("Update innodb.Help SET Volunteer_id=%d,Help_status='%s' WHERE Exhelp_id=%d",volunteerupdateId,"Assigned",helpRequestId);
+                stmt.executeUpdate(sqlUpdate);
+                connect.commit();
+                return true;
+            }
+            else
+            {
+                connect.rollback();
+            }
         } catch (SQLException e) {
             throw new RuntimeException(e);
 
         }
+
+        return false;
+    }
     }
 
-    @Override
-    public Object handleRequest(String s, Context context) {
-        return null;
-    }
-}
 
 
 

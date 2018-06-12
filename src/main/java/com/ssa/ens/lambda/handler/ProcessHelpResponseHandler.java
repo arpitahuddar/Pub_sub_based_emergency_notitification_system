@@ -11,31 +11,31 @@ import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
+import javax.xml.crypto.Data;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.*;
 
-public class ProcessHelpResponseHandler  implements RequestHandler<Map<String, Object>, Object>{
+public class ProcessHelpResponseHandler  implements RequestHandler<Map<String, Object>, Object> {
 
 
-    private static final String MQTT_SERVER_URL="tcp://ec2-34-220-247-164.us-west-2.compute.amazonaws.com:1883";
+    private static final String MQTT_SERVER_URL = "tcp://ec2-34-220-247-164.us-west-2.compute.amazonaws.com:1883";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Override
-    public Object handleRequest(Map<String, Object> input, Context context)
-    {
+    public Object handleRequest(Map<String, Object> input, Context context) {
         context.getLogger().log("Received Input: " + input.toString());
-        final int helpRequestId = (int)input.get("helpRequestId");
+        final int helpRequestId = (int) input.get("helpRequestId");
 
         context.getLogger().log("Subscribing help responses.. for help requestId:" + helpRequestId);
         final String helpRequestVolunteerRespTopic = String.format("%d_response", helpRequestId);
-       final HelpResponseMessageHandler msgHandler = new HelpResponseMessageHandler(context.getLogger());
+        final HelpResponseMessageHandler msgHandler = new HelpResponseMessageHandler(context.getLogger());
         MQTTMessageReceiver msgReceiver = new MQTTMessageReceiver(Utils.MQTT_SERVER_URL, UUID.randomUUID().toString(),
                 new String[]{helpRequestVolunteerRespTopic}, msgHandler);
         msgReceiver.subscribe();
         context.getLogger().log("Subscribed to help requestId topic:" + helpRequestVolunteerRespTopic);
 
-        final String topicName = (String)input.get("topicName");
+        final String topicName = (String) input.get("topicName");
         context.getLogger().log(String.format("Publishing helpRequest:%d to topic:%s", helpRequestId, topicName));
         publishToTopic(helpRequestId, topicName, context);
         context.getLogger().log(String.format("Successfully published helpRequest:%d to topic:%s", helpRequestId, topicName));
@@ -51,10 +51,15 @@ public class ProcessHelpResponseHandler  implements RequestHandler<Map<String, O
 
             //Map<String, Object> volunteers = msgHandler.getAccumulatedResponses().iterator().next();// implement find best volunteerId(find the best volunteerId, update the database and return volunteerId id)
 
-            int volunteerId = findBestVolunteer(msgHandler.getAccumulatedResponses(),(double)input.get("lat"),(double)input.get("lon"));
+            List<Integer> retrievedVolunteerList = orderedVolunteerByClosestDistance(msgHandler.getAccumulatedResponses(), (double) input.get("lat"), (double) input.get("lon"));
+            int volunteerId = updateVolunteer(retrievedVolunteerList, helpRequestId);
+
             context.getLogger().log("Matching volunteers:" + volunteerId);
-            matchVolunteer(volunteerId, helpRequestId);
-            updateBestVolunteerId(volunteerId,helpRequestId);
+            if(volunteerId!=-1)
+            {
+                matchVolunteer(volunteerId, helpRequestId);
+            }
+
 
         } else {
             context.getLogger().log("No Volunteer responded");
@@ -62,13 +67,45 @@ public class ProcessHelpResponseHandler  implements RequestHandler<Map<String, O
         return null;
     }
 
-    public void updateBestVolunteerId(int volunteerupdateId,int helpRequestId)
-    {
-        DatabaseConnect updateVolunteer=new DatabaseConnect();
-        String helpStatus="Assigned";
-        String sqlUpdate= String.format("Update innodb.Help SET Volunteer_id=%d,Help_status='%s' WHERE Exhelp_id=%d",volunteerupdateId,"Assigned",helpRequestId);
-        updateVolunteer.updateBestVolunteerDb(sqlUpdate);
+    public int updateVolunteer(List<Integer> retrievedVolunteerList, int helpId) {
+        DatabaseConnect volunteerUpdate = new DatabaseConnect();
+        for (Integer entry : retrievedVolunteerList) {
+            if (volunteerUpdate.updateBestVolunteerDb(entry, helpId)) {
+                return entry;
+            }
+        }
+        return -1;
     }
+
+
+    public List<Integer> orderedVolunteerByClosestDistance(List<Map<String,Object>> volunteerResponses, double userLat,double userLong) {
+        Iterator<Map<String, Object>> iterator = volunteerResponses.iterator();
+        Map<Double,List<Integer>> orderedVolunteerBasedOnDistance=new TreeMap<>();
+        List<Integer> listVolunteerID;
+        List<Integer> volunteerResult=new ArrayList<>();
+        int bestVolunteerID = 0;
+        double bestVolunteerDistance = Double.MAX_VALUE;
+        double recordedDistance;
+        while (iterator.hasNext()) {
+            Map<String, Object> volunteerResponse = iterator.next();
+            Integer volunteerId = (Integer) (volunteerResponse.get("volunteerUserId"));
+            double latitude = (double) volunteerResponse.get("lat");
+            double longtitude = (double) volunteerResponse.get("lon");
+            recordedDistance = findDistance(latitude, longtitude, userLat, userLong);
+            if(!orderedVolunteerBasedOnDistance.containsKey(recordedDistance))
+            {
+                orderedVolunteerBasedOnDistance.put(recordedDistance, new ArrayList<>());
+            }
+            listVolunteerID=orderedVolunteerBasedOnDistance.get(recordedDistance);
+            listVolunteerID.add(volunteerId);
+        }
+        for(List<Integer> entry: orderedVolunteerBasedOnDistance.values())
+        {
+            volunteerResult.addAll(entry);
+        }
+        return volunteerResult;
+    }
+
 
     static class HelpResponseMessageHandler implements MQTTMessageHandler
     {
@@ -131,26 +168,6 @@ public class ProcessHelpResponseHandler  implements RequestHandler<Map<String, O
         }
         return true;
     }
-        public int findBestVolunteer(List<Map<String,Object>> volunteerResponses, double userLat,double userLong) {
-            Iterator<Map<String, Object>> iterator = volunteerResponses.iterator();
-            int bestVolunteerID=0;
-            double bestVolunteerDistance=Double.MAX_VALUE;
-            double recordedDistance;
-            while (iterator.hasNext()) {
-                Map<String, Object> volunteerResponse = iterator.next();
-                Integer volunteerId = (Integer)(volunteerResponse.get("volunteerUserId"));
-                double latitude=(double)volunteerResponse.get("lat");
-                double longtitude=(double)volunteerResponse.get("lon");
-                recordedDistance=findDistance(latitude,longtitude,userLat,userLong);
-                if(recordedDistance<bestVolunteerDistance)
-                {
-                    bestVolunteerDistance=recordedDistance;
-                    bestVolunteerID=volunteerId;
-                }
-            }
-                return bestVolunteerID;
-        }
-
 
         public double findDistance(double volLat, double volLong,double userLat,double userLong)
         {
