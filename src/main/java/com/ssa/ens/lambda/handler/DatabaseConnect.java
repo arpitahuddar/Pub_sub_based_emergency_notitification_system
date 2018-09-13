@@ -88,6 +88,26 @@ public class DatabaseConnect {
 
         return false;
     }
+
+    public void reset()
+    {
+        try {
+            Connection connect = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+            String sql = String.format("Update innodb.Users SET User_currentHelpRequestId=null WHERE User_currentHelpRequestId is not null");
+            Statement stmt = connect.createStatement();
+            stmt.executeUpdate(sql);
+            String update=String.format("Update innodb.Help SET Help_status=null WHERE Help_status='Assigned'");
+            Statement stmt1 = connect.createStatement();
+            stmt.executeUpdate(update);
+            String update2=String.format("Update innodb.Help SET Help_status=null WHERE Help_status='in_progress'");
+            stmt.executeUpdate(update);
+        } catch(SQLException e)
+        {
+            throw new RuntimeException(e);
+        }
+    }
+
+
     }
 
 

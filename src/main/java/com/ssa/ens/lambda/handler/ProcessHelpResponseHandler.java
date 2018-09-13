@@ -11,9 +11,7 @@ import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
-import javax.xml.crypto.Data;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.*;
 
 public class ProcessHelpResponseHandler  implements RequestHandler<Map<String, Object>, Object> {
@@ -41,7 +39,7 @@ public class ProcessHelpResponseHandler  implements RequestHandler<Map<String, O
         context.getLogger().log(String.format("Successfully published helpRequest:%d to topic:%s", helpRequestId, topicName));
 
         try {
-            Thread.sleep(Duration.ofMinutes(1).toMillis());
+            Thread.sleep(30000);
         } catch (InterruptedException e) {
             context.getLogger().log("Thread interrupted. stopping subscription");
             msgReceiver.quit();
